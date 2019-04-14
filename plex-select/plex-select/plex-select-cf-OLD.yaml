@@ -1,0 +1,342 @@
+Resources:
+  PlexSelectLambdaUponLoadPolicy:
+    Type: AWS::IAM::Policy
+    DependsOn: PlexSelectLambdaUponLoadRole
+    Properties:
+      PolicyName: "plex-select-lambda-upon-load-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action: [
+              "logs:CreateLogGroup",
+              "logs:CreateLogStream",
+              "logs:PutLogEvents"
+              ]
+            Resource: "arn:aws:logs:*:*:*"
+          -
+            Effect: "Allow"
+            Action: [
+              "dynamodb:*",
+              "s3:Get*",
+              "s3:List*"
+              ]
+            Resource: "*"
+      Roles:
+        - Ref: "PlexSelectLambdaUponLoadRole"
+  PlexSelectLambdaUponLoadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "plex-select-lambda-upon-load-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+  PlexSelectLambdaUponLoadPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - PlexSelectLambdaUponLoad
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - "PlexSelectLambdaUponLoad"
+          - "Arn"
+      Action: "lambda:InvokeFunction"
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: "arn:aws:s3:::manny-and-meche-plex"
+  PlexSelectLambdaUponLoad:
+    Type: "AWS::Lambda::Function"
+    DependsOn:
+      - PlexSelectLambdaUponLoadRole
+    Properties:
+      FunctionName: "PlexSelectLambdaUponLoad"
+      Handler: "PlexSelectLambdaUponLoad.lambda_handler"
+      Role:
+        Fn::GetAtt:
+          - "PlexSelectLambdaUponLoadRole"
+          - "Arn"
+      Code:
+        S3Bucket: "manny-and-meche-plex"
+        S3Key: "PlexSelectLambdaUponLoad.zip"
+      Runtime: "python2.7"
+      Timeout: 45
+  PlexSelectLambdaAlexaPolicy:
+    Type: AWS::IAM::Policy
+    DependsOn: PlexSelectLambdaAlexaRole
+    Properties:
+      PolicyName: "plex-select-lambda-alexa-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action: [
+              "logs:CreateLogGroup",
+              "logs:CreateLogStream",
+              "logs:PutLogEvents"
+              ]
+            Resource: "arn:aws:logs:*:*:*"
+          -
+            Effect: "Allow"
+            Action: [
+              "dynamodb:*",
+              "ec2:RunInstances",
+              "ec2:TerminateInstances",
+              "ec2:StopInstances",
+              "ec2:StartInstances",
+              "ec2:CreateTags"
+              ]
+            Resource: "*"
+      Roles:
+        - Ref: "PlexSelectLambdaAlexaRole"
+  PlexSelectLambdaAlexaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "plex-select-lambda-alexa-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+  PlexSelectLambdaAlexaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - PlexSelectLambdaAlexa
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+          - "PlexSelectLambdaAlexa"
+          - "Arn"
+      Action: "lambda:InvokeFunction"
+      Principal: alexa-appkit.amazon.com
+  PlexSelectLambdaAlexa:
+    Type: "AWS::Lambda::Function"
+    DependsOn:
+      - PlexSelectLambdaAlexaRole
+      - PlexEc2LaunchTemplate
+    Properties:
+      FunctionName: "PlexSelectLambdaAlexa"
+      Handler: "PlexSelectLambdaAlexa.lambda_handler"
+      Role:
+        Fn::GetAtt:
+          - "PlexSelectLambdaAlexaRole"
+          - "Arn"
+      Code:
+        S3Bucket: "manny-and-meche-plex"
+        S3Key: "PlexSelectLambdaAlexa.zip"
+      Runtime: "python2.7"
+      Timeout: 30
+  PlexSelectEc2Policy:
+    Type: AWS::IAM::Policy
+    DependsOn: PlexSelectEc2Role
+    Properties:
+      PolicyName: "plex-select-ec2-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action: [
+              "s3:Get*",
+              "s3:List*",
+              "ec2:Describe*",
+              "ec2:RunInstances",
+              "ec2:TerminateInstances",
+              "ec2:StopInstances",
+              "ec2:StartInstances",
+              "ec2:CreateTags",
+              "cloudwatch:PutMetricAlarm",
+              "dynamodb:*",
+            ]
+            Resource: "*"
+      Roles:
+        - Ref: "PlexSelectEc2Role"
+  PassPlexSelectEc2Policy:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - PlexSelectEc2Policy
+      - PlexSelectEc2Role
+    Properties:
+      PolicyName: "pass-plex-select-ec2-policy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action: [
+              "iam:PassRole"
+            ]
+            Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/plex-select-ec2-role"
+      Roles:
+        -
+          Ref: "PlexSelectEc2Role"
+          Ref: "PlexSelectLambdaAlexaRole"
+  PlexSelectEc2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: "plex-select-ec2-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+  PlexSelectEc2InstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    DependsOn: PlexSelectEc2Role
+    Properties:
+      Path: "/"
+      Roles:
+        - Ref: PlexSelectEc2Role
+  PlexEc2LaunchTemplate:
+    Type: "AWS::EC2::LaunchTemplate"
+    DependsOn:
+      - PlexSelectEc2InstanceProfile
+      - PlexSelectSecurityGroup
+    Properties:
+      LaunchTemplateName: "plex-select-ec2-launch-template"
+      LaunchTemplateData:
+        InstanceType: t2.small
+        ImageId: ami-0ac019f4fcb7cb7e6
+        IamInstanceProfile:
+          Arn: !GetAtt
+            - PlexSelectEc2InstanceProfile
+            - Arn
+        SecurityGroups:
+          - Ref: PlexSelectSecurityGroup
+        KeyName: MyEC2KeyPair
+        BlockDeviceMappings:
+          - DeviceName: "/dev/sda1"
+            Ebs:
+              VolumeSize: 9
+              VolumeType: gp2
+              DeleteOnTermination: true
+        UserData:
+          'Fn::Base64':
+            !Sub |
+              #!/bin/bash
+              cd /home/ubuntu/
+              apt-get update
+              apt install awscli -y
+              apt install jq -y
+              aws s3 cp s3://manny-and-meche-plex/plex-select-setup.sh plex-select-setup.sh --region us-east-1
+              chmod +x plex-select-setup.sh
+              bash plex-select-setup.sh
+  PlexSelectSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable SSH, HTTP, HTTPS, and 32400 (required for Plex)
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIpv6: ::/0
+        - IpProtocol: tcp
+          FromPort: '32400'
+          ToPort: '32400'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '32400'
+          ToPort: '32400'
+          CidrIpv6: ::/0
+      Tags:
+        - Key: "Name"
+          Value: "Enable 22, 80, 443, 32400"
+  # PlexSelectEc2:
+  #   Type: AWS::EC2::Instance
+  #   DependsOn:
+  #     - PlexSelectEc2InstanceProfile
+  #     - PlexSelectSecurityGroup
+  #   Properties:
+  #     InstanceType: t2.small
+  #     ImageId: ami-0ac019f4fcb7cb7e6
+  #     IamInstanceProfile:
+  #       Ref: PlexSelectEc2InstanceProfile
+  #     SecurityGroups:
+  #       - Ref: PlexSelectSecurityGroup
+  #     Tags:
+  #       - Key: Name
+  #         Value: Avatar
+  #       - Key: Relaunch
+  #         Value: F
+  #       - Key: Owner
+  #         Value: tim
+  #     KeyName: MyEC2KeyPair
+  #     BlockDeviceMappings:
+  #         - DeviceName: "/dev/sda1"
+  #           Ebs:
+  #             VolumeSize: 9
+  #             VolumeType: gp2
+  #             DeleteOnTermination: true
+  #     UserData:
+  #       'Fn::Base64':
+  #         !Sub |
+  #           #!/bin/bash
+  #           cd /home/ubuntu/
+  #           apt-get update
+  #           apt install awscli -y
+  #           apt install jq -y
+  #           aws s3 cp s3://manny-and-meche-plex/plex.sh plex.sh --region us-east-1
+  #           chmod +x plex.sh
+  #           bash plex.sh
+  # PlexSelectDynamoLogs:
+  #   Type:_ AWS::DynamoDB::Table
+  #   Properties:
+  #     AttributeDefinitions:
+  #       -
+  #         AttributeName: "time"
+  #         AttributeType: "S"
+  #     KeySchema:
+  #       -
+  #         AttributeName: "time"
+  #         KeyType: "HASH"
+  #     ProvisionedThroughput:
+  #       ReadCapacityUnits: "5"
+  #       WriteCapacityUnits: "5"
+  #     TableName: "plex-select-logs"
+Outputs:
+  PlexSelectLambdaAlexaARN:
+    Value: !GetAtt
+      - PlexSelectLambdaAlexa
+      - Arn
+    Description: "Lambda function ARN to be placed in the Amazon Alexa Developer Portal"
